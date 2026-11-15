@@ -1,0 +1,10 @@
+import express from 'express';
+import BloodBank from '../models/BloodBank.js';
+import { protect } from '../middleware/authMiddleware.js';
+import { authorize } from '../middleware/roleMiddleware.js';
+const router = express.Router();
+router.get('/', async (req,res,next) => { try { const q={isDemo:{$ne:true},verified:true}; if(req.query.region) q.address={ $regex: req.query.region, $options:'i' }; if(req.query.bloodGroup) q['inventory.bloodGroup']=req.query.bloodGroup; const rows=await BloodBank.find(q).sort({verified:-1,name:1}).limit(200); res.json({success:true,count:rows.length,data:rows}); } catch(e){next(e);} });
+router.get('/:id', async(req,res,next)=>{try{const row=await BloodBank.findOne({_id:req.params.id,isDemo:{$ne:true},verified:true}).populate('hospitalId','name address phone'); if(!row)return res.status(404).json({success:false,message:'Blood bank not found'}); res.json({success:true,data:row});}catch(e){next(e);}});
+router.post('/',protect,authorize('admin','hospital'),async(req,res,next)=>{try{const row=await BloodBank.create({...req.body,isDemo:false});res.status(201).json({success:true,data:row});}catch(e){next(e);}});
+router.patch('/:id/inventory',protect,authorize('admin','hospital'),async(req,res,next)=>{try{const {inventory}=req.body;if(!Array.isArray(inventory))return res.status(400).json({success:false,message:'inventory array is required'});const row=await BloodBank.findOneAndUpdate({_id:req.params.id,isDemo:{$ne:true}},{inventory,verified:true},{new:true,runValidators:true});if(!row)return res.status(404).json({success:false,message:'Blood bank not found'});res.json({success:true,data:row});}catch(e){next(e);}});
+export default router;
